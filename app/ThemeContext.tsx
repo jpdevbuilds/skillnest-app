@@ -1,0 +1,63 @@
+"use client";
+import React, { createContext, useContext, useEffect, useState } from "react";
+
+type ThemeContextType = {
+    theme: "light" | "dark";
+    toggleTheme: () => void;
+};
+
+const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
+
+export function ThemeProvider({ children }: { children: React.ReactNode }) {
+    const [theme, setTheme] = useState<"light" | "dark">("light");
+
+    useEffect(() => {
+        // Get saved theme or system preference
+        const saved = localStorage.getItem("theme");
+        const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+        const initialTheme = (saved as "light" | "dark") || (prefersDark ? "dark" : "light");
+        
+        setTheme(initialTheme);
+        applyTheme(initialTheme);
+    }, []);
+
+    const applyTheme = (newTheme: "light" | "dark") => {
+        const html = document.documentElement;
+        if (newTheme === "dark") {
+            html.classList.add("dark");
+        } else {
+            html.classList.remove("dark");
+        }
+        localStorage.setItem("theme", newTheme);
+    };
+
+    const toggleTheme = () => {
+
+
+        setTheme((prevTheme) => {
+
+            const newTheme =
+                prevTheme === "light"
+                    ? "dark"
+                    : "light";
+
+            applyTheme(newTheme);
+
+            return newTheme;
+        });
+    };
+
+    return (
+        <ThemeContext.Provider value={{ theme, toggleTheme }}>
+            {children}
+        </ThemeContext.Provider>
+    );
+}
+
+export function useTheme() {
+    const context = useContext(ThemeContext);
+    if (context === undefined) {
+        throw new Error("useTheme must be used within ThemeProvider");
+    }
+    return context;
+}
