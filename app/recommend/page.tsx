@@ -21,6 +21,7 @@ export default function RecommendPage() {
     const [hours, setHours] = useState("10");
     const [roadmap, setRoadmap] = useState("");
     const [loading, setLoading] = useState(false);
+    const [searchTerm, setSearchTerm] = useState("");
     const [error, setError] = useState("");
     const [roadmaps, setRoadmaps] = useState<SavedRoadmap[]>([]);
 
@@ -97,6 +98,10 @@ export default function RecommendPage() {
         setRoadmaps(updated);
         localStorage.setItem("roadmaps", JSON.stringify(updated));
     };
+
+    const filteredRoadmaps = roadmaps.filter((roadmap) =>
+        roadmap.skill.toLowerCase().includes(searchTerm.toLowerCase())
+    );
 
     return (
         <main className="min-h-screen px-6">
@@ -236,9 +241,14 @@ export default function RecommendPage() {
                 {/* Saved Roadmaps Section */}
                 {roadmaps.length > 0 && (
                     <div className="mt-12 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-8 shadow-lg transition-colors">
+                        <input type="text" placeholder="Search saved roadmaps..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}className="w-full mb-6 border border-gray-300 dark:border-gray-700 p-4 rounded-xl bg-white dark:bg-gray-800" 
+                        />
                         <h2 className="text-2xl font-bold mb-6">Saved Roadmaps</h2>
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
+                            {roadmaps.length} roadmap{roadmaps.length !== 1 ? "s" : ""} saved
+                        </p>
                         <div className="grid md:grid-cols-2 gap-4">
-                            {roadmaps.map((saved) => (
+                            {filteredRoadmaps.map((saved) => (
                                 <div
                                     key={saved.id}
                                     className="border border-gray-200 dark:border-gray-800 rounded-lg p-4 bg-gray-50 dark:bg-gray-800 hover:shadow-md transition-all"
@@ -273,5 +283,3 @@ export default function RecommendPage() {
         </main>
     );
 }
-
-// Component to render markdown-style roadmap
