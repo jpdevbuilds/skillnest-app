@@ -20,7 +20,7 @@ export default function Footer() {
 
         {/* Small note */}
         <div className="text-xs text-gray-500 dark:text-gray-500">
-          Built by you • 2026
+          Built by JpDev. • 2026
         </div>
 
       </div>
