@@ -5,7 +5,6 @@ import { Loader, Trash2 } from "lucide-react";
 import RoadmapDisplay from "@/components/RoadmapDisplay";
 import Footer from "@/components/Footer";
 
-
 interface SavedRoadmap {
     id: string;
     skill: string;
@@ -13,6 +12,25 @@ interface SavedRoadmap {
     savedAt: string;
     roadmap: string;
 }
+const injectAffiliateLinks = (text: string) => {
+  let updatedText = text;
+
+  // Create your dictionary of affiliate links
+  const affiliateMap = {
+    "Recommended Course: Udemy": "[Recommended Course: Udemy](https://click.linksynergy.com/fs-bin/click?id=YOUR_UDEMY_ID)",
+    "Recommended Course: Coursera": "[Recommended Course: Coursera](https://coursera.pxf.io/c/YOUR_COURSERA_ID)",
+    "Recommended Tool: Hostinger": "[Recommended Tool: Hostinger](https://hostinger.com?REFERRAL_ID)",
+    "Recommended Tool: Notion": "[Recommended Tool: Notion](https://notion.grsm.io/YOUR_NOTION_ID)"
+  };
+
+  // Loop through and swap raw text for markdown links
+  Object.entries(affiliateMap).forEach(([keyword, affiliateLink]) => {
+    const regex = new RegExp(keyword, "g");
+    updatedText = updatedText.replace(regex, affiliateLink);
+  });
+
+  return updatedText;
+};
 
 export default function RecommendPage() {
     const [skill, setSkill] = useState("");
@@ -35,7 +53,6 @@ export default function RecommendPage() {
                 console.error("Failed to load roadmaps", e);
             }
         }
-
     }, []);
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -49,6 +66,8 @@ export default function RecommendPage() {
 
         try {
             setLoading(true);
+            
+            // Connected directly to your local endpoint layout properties
             const response = await fetch("/api/recommend", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -63,9 +82,10 @@ export default function RecommendPage() {
                 return;
             }
 
+            // Sets the data string dynamically right into your custom RoadmapDisplay layout engine
             setRoadmap(data.roadmap);
 
-            // Auto-save to localStorage
+            // Auto-save to localStorage using your exact state parameters
             const newRoadmap: SavedRoadmap = {
                 id: Date.now().toString(),
                 skill,
@@ -108,7 +128,7 @@ export default function RecommendPage() {
             <Navbar />
             <div className="max-w-3xl mx-auto mt-12">
                 <div className="mb-12">
-                    <h1 className="text-5xl font-bold mb-2">
+                    <h1 className="text-5xl font-bold mb-2 tracking-tight">
                         Generate Your Learning Roadmap
                     </h1>
                     <p className="text-gray-600 dark:text-gray-400">
@@ -206,16 +226,14 @@ export default function RecommendPage() {
                     </div>
                 </form>
 
-                {/* Roadmap Display */}
+                {/* Roadmap Display Wrapper - Layout Preserved */}
                 {roadmap && (
                     <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-8 shadow-lg transition-colors">
                         <div className="flex items-center justify-between mb-6">
-
                             <div>
                                 <h2 className="text-2xl font-bold">
                                     Your Personalized Roadmap
                                 </h2>
-
                                 <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                                     Tailored to your goals, budget, and learning pace.
                                 </p>
@@ -226,22 +244,26 @@ export default function RecommendPage() {
                                     navigator.clipboard.writeText(roadmap);
                                     alert("Roadmap copied!");
                                 }}
-                                className="px-4 py-2 rounded-xl border border-gray-300 dark:border-gray-700 text-sm hover:opacity-80 transition"
+                                className="px-4 py-2 rounded-xl border border-gray-300 dark:border-gray-700 text-sm hover:opacity-80 transition dark:text-white"
                             >
                                 Copy
                             </button>
-
                         </div>
                         <div className="prose prose-sm dark:prose-invert max-w-none">
-                            <RoadmapDisplay content={roadmap} />
+                            <RoadmapDisplay content={injectAffiliateLinks(roadmap)} />
                         </div>
                     </div>
                 )}
 
                 {/* Saved Roadmaps Section */}
                 {roadmaps.length > 0 && (
-                    <div className="mt-12 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-8 shadow-lg transition-colors">
-                        <input type="text" placeholder="Search saved roadmaps..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}className="w-full mb-6 border border-gray-300 dark:border-gray-700 p-4 rounded-xl bg-white dark:bg-gray-800" 
+                    <div className="mt-12 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-8 shadow-lg transition-colors mb-12">
+                        <input 
+                            type="text" 
+                            placeholder="Search saved roadmaps..." 
+                            value={searchTerm} 
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="w-full mb-6 border border-gray-300 dark:border-gray-700 p-4 rounded-xl bg-white dark:bg-gray-800 text-black dark:text-white outline-none focus:ring-2 focus:ring-black dark:focus:ring-white transition-all" 
                         />
                         <h2 className="text-2xl font-bold mb-6">Saved Roadmaps</h2>
                         <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
@@ -251,11 +273,11 @@ export default function RecommendPage() {
                             {filteredRoadmaps.map((saved) => (
                                 <div
                                     key={saved.id}
-                                    className="border border-gray-200 dark:border-gray-800 rounded-lg p-4 bg-gray-50 dark:bg-gray-800 hover:shadow-md transition-all"
+                                    className="border border-gray-200 dark:border-gray-800 rounded-lg p-4 bg-gray-50 dark:bg-gray-800 hover:shadow-md transition-all flex flex-col justify-between gap-4"
                                 >
-                                    <div className="flex justify-between items-start mb-2">
+                                    <div className="flex justify-between items-start">
                                         <div>
-                                            <h3 className="font-semibold text-lg">{saved.skill}</h3>
+                                            <h3 className="font-semibold text-lg text-black dark:text-white">{saved.skill}</h3>
                                             <p className="text-sm text-gray-600 dark:text-gray-400">
                                                 {saved.level.charAt(0).toUpperCase() + saved.level.slice(1)} • {saved.savedAt}
                                             </p>
@@ -269,7 +291,7 @@ export default function RecommendPage() {
                                     </div>
                                     <button
                                         onClick={() => loadRoadmap(saved)}
-                                        className="w-full bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg transition text-sm"
+                                        className="w-full bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg transition text-sm font-medium"
                                     >
                                         Load Roadmap
                                     </button>
