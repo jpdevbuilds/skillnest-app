@@ -12,6 +12,13 @@ interface SavedRoadmap {
     savedAt: string;
     roadmap: string;
 }
+const LOADING_PHRASES = [
+  "Analyzing your skill level and target constraints...",
+  "Scanning industry-standard frameworks and courses...",
+  "Curating optimal educational resources for your budget...",
+  "Structuring milestones and estimated hours...",
+  "Finalizing your personalized learning path..."
+];
 const injectAffiliateLinks = (text: string) => {
   let updatedText = text;
 
@@ -41,6 +48,7 @@ export default function RecommendPage() {
     const [loading, setLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");
     const [error, setError] = useState("");
+    const [currentPhraseIndex, setCurrentPhraseIndex] = useState(0);
     const [roadmaps, setRoadmaps] = useState<SavedRoadmap[]>([]);
 
     // Load saved roadmaps from localStorage on mount
@@ -54,6 +62,22 @@ export default function RecommendPage() {
             }
         }
     }, []);
+
+    useEffect(() => {
+        let interval: NodeJS.Timeout;
+        
+        if (loading) {
+            setCurrentPhraseIndex(0); // Reset to first phrase when loading starts
+            interval = setInterval(() => {
+            setCurrentPhraseIndex((prevIndex) => 
+                prevIndex < LOADING_PHRASES.length - 1 ? prevIndex + 1 : prevIndex
+            );
+            }, 2000); // Changes phrase every 2 seconds
+        }
+        
+        return () => clearInterval(interval);
+        }, [loading]
+    );
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -117,6 +141,35 @@ export default function RecommendPage() {
         const updated = roadmaps.filter((r) => r.id !== id);
         setRoadmaps(updated);
         localStorage.setItem("roadmaps", JSON.stringify(updated));
+    };
+
+    const exportToMarkdown = () => {
+        if (!roadmap) return;
+
+        // Create a clean header template for the exported file
+        const fileHeader = `# SkillNest Custom Learning Roadmap\n`;
+        const fileSubHeader = `*Generated on ${new Date().toLocaleDateString()} | Tailored for: ${skill} (${level})*\n\n---\n\n`;
+        
+        // Combine the template headers with the live roadmap content
+        const fullContent = fileHeader + fileSubHeader + roadmap;
+
+        // Convert the string into a browser blob
+        const blob = new Blob([fullContent], { type: "text/markdown;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
+        
+        // Create a temporary hidden link element to force the download window
+        const link = document.createElement("a");
+        link.href = url;
+        
+        // Format the file name dynamically based on the target skill
+        const safeFileName = skill.toLowerCase().replace(/[^a-z0-9]/g, "-");
+        link.setAttribute("download", `skillnest-${safeFileName}-roadmap.md`);
+        
+        // Append, click, and immediately clean up the DOM element
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
     };
 
     const filteredRoadmaps = roadmaps.filter((roadmap) =>
@@ -212,15 +265,20 @@ export default function RecommendPage() {
                         <button
                             type="submit"
                             disabled={loading}
-                            className="w-full bg-black dark:bg-white text-white dark:text-black font-semibold p-4 rounded-lg hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center justify-center gap-2"
+                            className="w-full bg-black dark:bg-white text-white dark:text-black font-semibold p-4 rounded-lg hover:opacity-90 disabled:opacity-75 disabled:cursor-not-allowed transition flex flex-col items-center justify-center gap-2 min-h-[72px]"
                         >
                             {loading ? (
-                                <>
-                                    <Loader size={20} className="animate-spin" />
-                                    Generating your roadmap...
-                                </>
+                                <div className="flex flex-col items-center gap-1.5 w-full">
+                                    <div className="flex items-center gap-2 font-bold tracking-wide">
+                                        <Loader size={18} className="animate-spin text-blue-500 dark:text-blue-400" />
+                                        <span>SkillNest AI Engine Active</span>
+                                    </div>
+                                    <p className="text-xs text-gray-400 dark:text-gray-500 animate-pulse text-center px-4">
+                                        {LOADING_PHRASES[currentPhraseIndex]}
+                                    </p>
+                                </div>
                             ) : (
-                                "Generate Roadmap"
+                                <span className="text-base tracking-wide">Generate Roadmap</span>
                             )}
                         </button>
                     </div>
@@ -229,7 +287,7 @@ export default function RecommendPage() {
                 {/* Roadmap Display Wrapper - Layout Preserved */}
                 {roadmap && (
                     <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-8 shadow-lg transition-colors">
-                        <div className="flex items-center justify-between mb-6">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
                             <div>
                                 <h2 className="text-2xl font-bold">
                                     Your Personalized Roadmap
@@ -239,21 +297,68 @@ export default function RecommendPage() {
                                 </p>
                             </div>
 
-                            <button
-                                onClick={() => {
-                                    navigator.clipboard.writeText(roadmap);
-                                    alert("Roadmap copied!");
-                                }}
-                                className="px-4 py-2 rounded-xl border border-gray-300 dark:border-gray-700 text-sm hover:opacity-80 transition dark:text-white"
-                            >
-                                Copy
-                            </button>
+                            {/* UPGRADED ACTION SECTION BUTTONS CONTAINER */}
+                            <div className="flex items-center gap-2 self-start sm:self-center">
+                                <button
+                                    onClick={() => {
+                                        navigator.clipboard.writeText(injectAffiliateLinks(roadmap));
+                                        alert("Roadmap copied!");
+                                    }}
+                                    className="px-4 py-2 rounded-xl border border-gray-300 dark:border-gray-700 text-sm hover:bg-gray-50 dark:hover:bg-gray-800 font-medium transition text-black dark:text-white"
+                                >
+                                    Copy Text
+                                </button>
+                                
+                                <button
+                                    onClick={exportToMarkdown}
+                                    className="px-4 py-2 rounded-xl bg-black dark:bg-white text-white dark:text-black text-sm hover:opacity-90 font-medium transition shadow-sm"
+                                >
+                                    Download (.md)
+                                </button>
+                            </div>
                         </div>
+                        
                         <div className="prose prose-sm dark:prose-invert max-w-none">
                             <RoadmapDisplay content={injectAffiliateLinks(roadmap)} />
                         </div>
+                        
+                        {/* Your newsletter block will sit right here */}
                     </div>
                 )}
+
+                {/* ========================================================= */}
+                {/*  NEW: HIGH-CONVERSION ACCELERATOR BOX */}
+                {/* ========================================================= */}
+                <div className="mt-12 p-6 rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-gray-800/50 dark:to-slate-800/50 border border-blue-100 dark:border-gray-800 text-center">
+                    <span className="text-2xl">💡</span>
+                    <h3 className="text-lg font-bold text-gray-900 dark:text-white mt-2">
+                        Want to fast-track your tracking parameters?
+                    </h3>
+                    <p className="text-sm text-gray-600 dark:text-gray-400 max-w-md mx-auto mt-1">
+                        Join 1,200+ indie builders getting weekly micro-SaaS case studies, custom system prompts, and monetization templates directly to their inbox.
+                    </p>
+                
+                    <form 
+                        onSubmit={(e) => {
+                        e.preventDefault();
+                        alert("Hooked up! Form submission ready to point to your Beehiiv/ConvertKit endpoint.");
+                        }}
+                        className="mt-4 flex flex-col sm:flex-row gap-2 max-w-md mx-auto"
+                    >
+                        <input 
+                        type="email" 
+                        required
+                        placeholder="Enter your best email..." 
+                        className="flex-1 px-4 py-2.5 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                        <button 
+                        type="submit"
+                        className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-medium text-sm transition"
+                        >
+                        Join Builders Nest
+                        </button>
+                    </form>
+                </div>
 
                 {/* Saved Roadmaps Section */}
                 {roadmaps.length > 0 && (
