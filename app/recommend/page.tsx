@@ -12,6 +12,7 @@ interface SavedRoadmap {
     savedAt: string;
     roadmap: string;
 }
+
 const LOADING_PHRASES = [
   "Analyzing your skill level and target constraints...",
   "Scanning industry-standard frameworks and courses...",
@@ -19,22 +20,29 @@ const LOADING_PHRASES = [
   "Structuring milestones and estimated hours...",
   "Finalizing your personalized learning path..."
 ];
-const injectAffiliateLinks = (text: string) => {
+
+// Moving this helper definition out of the component cycle prevents redundant re-renders
+const injectAffiliateLinks = (text: string): string => {
+  if (!text) return "";
   let updatedText = text;
 
-  // Create your dictionary of affiliate links
-  const affiliateMap = {
-    "Recommended Course: Udemy": "[Recommended Course: Udemy](https://click.linksynergy.com/fs-bin/click?id=YOUR_UDEMY_ID)",
-    "Recommended Course: Coursera": "[Recommended Course: Coursera](https://coursera.pxf.io/c/YOUR_COURSERA_ID)",
-    "Recommended Tool: Hostinger": "[Recommended Tool: Hostinger](https://hostinger.com?REFERRAL_ID)",
-    "Recommended Tool: Notion": "[Recommended Tool: Notion](https://notion.grsm.io/YOUR_NOTION_ID)"
+  const links = {
+    udemy: "https://click.linksynergy.com/fs-bin/click?id=YOUR_UDEMY_ID",
+    coursera: "https://coursera.pxf.io/c/YOUR_COURSERA_ID",
+    hostinger: "https://hostinger.com?YOUR_REFERRAL_ID",
+    notion: "https://notion.grsm.io/YOUR_NOTION_ID"
   };
 
-  // Loop through and swap raw text for markdown links
-  Object.entries(affiliateMap).forEach(([keyword, affiliateLink]) => {
-    const regex = new RegExp(keyword, "g");
-    updatedText = updatedText.replace(regex, affiliateLink);
-  });
+  // 1. Clean up any pre-existing markdown links to these brands so we don't double-wrap them
+  updatedText = updatedText.replace(/\[([^\]]+)\]\(https?:\/\/(www\.)?udemy\.com[^\)]*\)/gi, "$1");
+  updatedText = updatedText.replace(/\[([^\]]+)\]\(https?:\/\/(www\.)?coursera\.org[^\)]*\)/gi, "$1");
+
+  // 2. Universal Interceptor: Catch the brand name anywhere it appears as plain text
+  // This safely turns the plain word "Udemy" into "[Udemy](your_affiliate_link)"
+  updatedText = updatedText.replace(/(?<!\[)\bUdemy\b(?!\])/gi, `[Udemy](${links.udemy})`);
+  updatedText = updatedText.replace(/(?<!\[)\bCoursera\b(?!\])/gi, `[Coursera](${links.coursera})`);
+  updatedText = updatedText.replace(/(?<!\[)\bHostinger\b(?!\])/gi, `[Hostinger](${links.hostinger})`);
+  updatedText = updatedText.replace(/(?<!\[)\bNotion\b(?!\])/gi, `[Notion](${links.notion})`);
 
   return updatedText;
 };
@@ -63,21 +71,21 @@ export default function RecommendPage() {
         }
     }, []);
 
+    // Loader interval switcher loop
     useEffect(() => {
         let interval: NodeJS.Timeout;
         
         if (loading) {
-            setCurrentPhraseIndex(0); // Reset to first phrase when loading starts
+            setCurrentPhraseIndex(0);
             interval = setInterval(() => {
-            setCurrentPhraseIndex((prevIndex) => 
-                prevIndex < LOADING_PHRASES.length - 1 ? prevIndex + 1 : prevIndex
-            );
-            }, 2000); // Changes phrase every 2 seconds
+                setCurrentPhraseIndex((prevIndex) => 
+                    prevIndex < LOADING_PHRASES.length - 1 ? prevIndex + 1 : prevIndex
+                );
+            }, 2000);
         }
         
         return () => clearInterval(interval);
-        }, [loading]
-    );
+    }, [loading]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -91,7 +99,6 @@ export default function RecommendPage() {
         try {
             setLoading(true);
             
-            // Connected directly to your local endpoint layout properties
             const response = await fetch("/api/recommend", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -106,16 +113,17 @@ export default function RecommendPage() {
                 return;
             }
 
-            // Sets the data string dynamically right into your custom RoadmapDisplay layout engine
-            setRoadmap(data.roadmap);
+            // CRITICAL FIX: Intercept raw text and inject affiliate links BEFORE setting state
+            const monetizedRoadmap = injectAffiliateLinks(data.roadmap);
+            setRoadmap(monetizedRoadmap);
 
-            // Auto-save to localStorage using your exact state parameters
+            // Auto-save the processed, live link version into history tracking
             const newRoadmap: SavedRoadmap = {
                 id: Date.now().toString(),
                 skill,
                 level,
                 savedAt: new Date().toLocaleDateString(),
-                roadmap: data.roadmap,
+                roadmap: monetizedRoadmap,
             };
 
             const updatedRoadmaps = [newRoadmap, ...roadmaps];
@@ -132,7 +140,8 @@ export default function RecommendPage() {
     const loadRoadmap = (saved: SavedRoadmap) => {
         setSkill(saved.skill);
         setLevel(saved.level);
-        setRoadmap(saved.roadmap);
+        // If older local storage items contain raw text, we parse them smoothly on load here
+        setRoadmap(injectAffiliateLinks(saved.roadmap));
         window.scrollTo({ top: 0, behavior: "smooth" });
     };
 
@@ -146,26 +155,21 @@ export default function RecommendPage() {
     const exportToMarkdown = () => {
         if (!roadmap) return;
 
-        // Create a clean header template for the exported file
         const fileHeader = `# SkillNest Custom Learning Roadmap\n`;
         const fileSubHeader = `*Generated on ${new Date().toLocaleDateString()} | Tailored for: ${skill} (${level})*\n\n---\n\n`;
         
-        // Combine the template headers with the live roadmap content
+        // roadmap state is now pre-compiled with links, ensuring file preservation
         const fullContent = fileHeader + fileSubHeader + roadmap;
 
-        // Convert the string into a browser blob
         const blob = new Blob([fullContent], { type: "text/markdown;charset=utf-8;" });
         const url = URL.createObjectURL(blob);
         
-        // Create a temporary hidden link element to force the download window
         const link = document.createElement("a");
         link.href = url;
         
-        // Format the file name dynamically based on the target skill
-        const safeFileName = skill.toLowerCase().replace(/[^a-z0-9]/g, "-");
+        const safeFileName = skill.toLowerCase().replace(/[^a-z0-9]/g, "-") || "roadmap";
         link.setAttribute("download", `skillnest-${safeFileName}-roadmap.md`);
         
-        // Append, click, and immediately clean up the DOM element
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -284,24 +288,23 @@ export default function RecommendPage() {
                     </div>
                 </form>
 
-                {/* Roadmap Display Wrapper - Layout Preserved */}
+                {/* Roadmap Display Canvas Wrapper */}
                 {roadmap && (
-                    <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-8 shadow-lg transition-colors">
+                    <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-8 shadow-lg transition-colors mb-8">
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
                             <div>
                                 <h2 className="text-2xl font-bold">
                                     Your Personalized Roadmap
-                                </h2>
+                               </h2>
                                 <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                                     Tailored to your goals, budget, and learning pace.
                                 </p>
                             </div>
 
-                            {/* UPGRADED ACTION SECTION BUTTONS CONTAINER */}
                             <div className="flex items-center gap-2 self-start sm:self-center">
                                 <button
                                     onClick={() => {
-                                        navigator.clipboard.writeText(injectAffiliateLinks(roadmap));
+                                        navigator.clipboard.writeText(roadmap);
                                         alert("Roadmap copied!");
                                     }}
                                     className="px-4 py-2 rounded-xl border border-gray-300 dark:border-gray-700 text-sm hover:bg-gray-50 dark:hover:bg-gray-800 font-medium transition text-black dark:text-white"
@@ -318,18 +321,18 @@ export default function RecommendPage() {
                             </div>
                         </div>
                         
-                        <div className="prose prose-sm dark:prose-invert max-w-none">
-                            <RoadmapDisplay content={injectAffiliateLinks(roadmap)} />
+                        {/* Upgraded Container Classes: Explicitly forcing text-blue and hover effects */}
+                        <div className="prose prose-sm dark:prose-invert max-w-none 
+                        [&_a]:text-blue-600 [&_a]:dark:text-blue-400 
+                        [&_a]:underline [&_a]:font-semibold 
+                        hover:[&_a]:text-blue-700 hover:[&_a]:dark:text-blue-300">
+                            <RoadmapDisplay content={roadmap} />
                         </div>
-                        
-                        {/* Your newsletter block will sit right here */}
                     </div>
                 )}
 
-                {/* ========================================================= */}
-                {/*  NEW: HIGH-CONVERSION ACCELERATOR BOX */}
-                {/* ========================================================= */}
-                <div className="mt-12 p-6 rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-gray-800/50 dark:to-slate-800/50 border border-blue-100 dark:border-gray-800 text-center">
+                {/* Newsletter Box Layout */}
+                <div className="mt-12 p-6 rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-gray-800/50 dark:to-slate-800/50 border border-blue-100 dark:border-gray-800 text-center mb-12">
                     <span className="text-2xl">💡</span>
                     <h3 className="text-lg font-bold text-gray-900 dark:text-white mt-2">
                         Want to fast-track your tracking parameters?
@@ -337,30 +340,9 @@ export default function RecommendPage() {
                     <p className="text-sm text-gray-600 dark:text-gray-400 max-w-md mx-auto mt-1">
                         Join 1,200+ indie builders getting weekly micro-SaaS case studies, custom system prompts, and monetization templates directly to their inbox.
                     </p>
-                
-                    <form 
-                        onSubmit={(e) => {
-                        e.preventDefault();
-                        alert("Hooked up! Form submission ready to point to your Beehiiv/ConvertKit endpoint.");
-                        }}
-                        className="mt-4 flex flex-col sm:flex-row gap-2 max-w-md mx-auto"
-                    >
-                        <input 
-                        type="email" 
-                        required
-                        placeholder="Enter your best email..." 
-                        className="flex-1 px-4 py-2.5 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                        <button 
-                        type="submit"
-                        className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-medium text-sm transition"
-                        >
-                        Join Builders Nest
-                        </button>
-                    </form>
                 </div>
 
-                {/* Saved Roadmaps Section */}
+                {/* Saved Roadmaps Grid Layout */}
                 {roadmaps.length > 0 && (
                     <div className="mt-12 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-8 shadow-lg transition-colors mb-12">
                         <input 
